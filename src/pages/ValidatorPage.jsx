@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useConnection } from '@solana/wallet-adapter-react';
 import { useAppWallet } from '@/hooks/useAppWallet';
-import { Program, AnchorProvider, web3 } from '@coral-xyz/anchor';
+import { Program, AnchorProvider, web3, BN } from '@coral-xyz/anchor';
 import toast from 'react-hot-toast';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import idl from '@/idl/ticketing_system.json';
@@ -335,8 +335,8 @@ export function ValidatorPage() {
                 if (data.isValidator) {
                     setEventAccount({
                         validators: [], // Não precisamos mais desta lista completa
-                        ticketsSold: new web3.BN(data.totalTicketsSold || 0),
-                        totalTickets: new web3.BN(0) // Não temos esta informação, mas pode ser buscada se necessário
+                        ticketsSold: new BN(data.totalTicketsSold || 0),
+                        totalTickets: new BN(0) // Não temos esta informação, mas pode ser buscada se necessário
                     });
                     console.log('✅ Validador autorizado para o evento:', data.eventName);
                 } else {
@@ -609,27 +609,7 @@ export function ValidatorPage() {
     
     return (
         <div className="bg-slate-50 min-h-screen">
-            <header className="bg-white shadow-sm sticky top-0 z-10">
-                <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-                    <div className="flex items-center gap-3">
-                        <ShieldCheckIcon className="h-8 w-8 text-indigo-600"/>
-                        <div>
-                            <h1 className="text-xl font-bold text-slate-800">
-                                Painel do Validador {eventName && `- ${eventName}`}
-                            </h1>
-                            <p className="text-sm text-slate-500 font-mono truncate max-w-xs">
-                                {publicKey.toString()}
-                                {isAuthenticated && (
-                                    <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                                        Autenticação Local ({loginType})
-                                    </span>
-                                )}
-                            </p>
-                        </div>
-                    </div>
-                    <WalletMultiButton />
-                </div>
-            </header>
+ 
 
             <main className="container mx-auto p-4 md:p-8 grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
                 <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow-md">
@@ -650,12 +630,7 @@ export function ValidatorPage() {
                                 icon={UserGroupIcon} 
                                 color="bg-green-500" 
                             />
-                            <StatCard 
-                                title="Total Vendido" 
-                                value={eventAccount?.ticketsSold.toString() || '0'} 
-                                icon={TicketIcon} 
-                                color="bg-blue-500" 
-                            />
+                     
                         </div>
                     </div>
                     
