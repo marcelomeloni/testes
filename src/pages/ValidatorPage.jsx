@@ -303,6 +303,7 @@ export function ValidatorPage() {
     const [isValidator, setIsValidator] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [recentEntries, setRecentEntries] = useState([]);
+    const [eventName, setEventName] = useState('');
     
     // Estados para o modal e controle do scanner
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -311,41 +312,59 @@ export function ValidatorPage() {
     const [isValidating, setIsValidating] = useState(false);
     const [isScannerPaused, setIsScannerPaused] = useState(false);
 
-    const readOnlyProgram = useMemo(() => {
-        const provider = new AnchorProvider(connection, {}, AnchorProvider.defaultOptions());
-        return new Program(idl, PROGRAM_ID, provider);
-    }, [connection]);
-    
-    useEffect(() => {
-        const checkValidatorStatus = async () => {
-            if (!publicKey || !readOnlyProgram) {
-                setIsValidator(false);
-                return;
-            }
-            setIsLoading(true);
-            try {
-                const event = await readOnlyProgram.account.event.fetch(new web3.PublicKey(eventAddress));
-                setEventAccount(event);
-                const validatorPubkeys = event.validators.map(v => v.toString());
-                const isUserAValidator = validatorPubkeys.includes(publicKey.toString());
-                setIsValidator(isUserAValidator);
-                console.log(`[VALIDATOR] Status verificado: ${isUserAValidator ? 'AUTORIZADO' : 'NÃO AUTORIZADO'}`);
-            } catch (error) {
-                console.error("[VALIDATOR] Erro ao carregar evento:", error);
-                toast.error("Não foi possível carregar os dados do evento.");
-                setIsValidator(false);
-            } finally {
-                setIsLoading(false);
-            }
-        };
+    // ✅ ATUALIZADO: Nova função otimizada para verificar permissões
+    const checkValidatorStatus = useCallback(async () => {
+        if (!eventAddress || !publicKey) return;
         
-        if (connected) {
+        console.log('🔍 Verificando permissões do validador via API otimizada...');
+        setIsLoading(true);
+
+        try {
+            // Chamada otimizada para o novo endpoint
+            const response = await fetch(
+                `${API_URL}/api/validations/event-status/${eventAddress}/${publicKey.toString()}`
+            );
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                setIsValidator(data.isValidator);
+                setEventName(data.eventName);
+                
+                // Atualizar estado com informações do evento
+                if (data.isValidator) {
+                    setEventAccount({
+                        validators: [], // Não precisamos mais desta lista completa
+                        ticketsSold: new web3.BN(data.totalTicketsSold || 0),
+                        totalTickets: new web3.BN(0) // Não temos esta informação, mas pode ser buscada se necessário
+                    });
+                    console.log('✅ Validador autorizado para o evento:', data.eventName);
+                } else {
+                    console.log('❌ Validador não autorizado');
+                }
+            } else {
+                console.error('Erro na verificação:', data.error);
+                toast.error('Erro ao verificar permissões: ' + (data.details || data.error));
+                setIsValidator(false);
+            }
+        } catch (error) {
+            console.error('Erro na verificação de permissões:', error);
+            toast.error('Erro ao conectar com o servidor');
+            setIsValidator(false);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [eventAddress, publicKey]);
+
+    // ✅ ATUALIZADO: useEffect simplificado usando a nova API
+    useEffect(() => {
+        if (connected && publicKey && eventAddress) {
             checkValidatorStatus();
         } else {
             setIsLoading(false);
             setIsValidator(false);
         }
-    }, [connected, publicKey, readOnlyProgram, eventAddress]);
+    }, [connected, publicKey, eventAddress, checkValidatorStatus]);
     
     const fetchRecentEntries = useCallback(async () => {
         try {
@@ -402,7 +421,7 @@ export function ValidatorPage() {
         }
     };
 
-    // Função principal de escaneamento - MUITO MAIS SIMPLES E FLUIDA
+    // Função principal de escaneamento
     const handleScanOrSearch = async (registrationId) => {
         if (!registrationId) {
             toast.error("ID do ingresso inválido");
@@ -581,6 +600,9 @@ export function ValidatorPage() {
                 <h1 className="mt-4 text-2xl font-bold">Acesso Negado</h1>
                 <p className="mt-2">A carteira conectada não é um validador autorizado para este evento.</p>
                 <p className="mt-1 text-sm text-slate-600">Endereço: {publicKey.toString().slice(0, 8)}...{publicKey.toString().slice(-8)}</p>
+                {eventName && (
+                    <p className="mt-1 text-sm text-slate-600">Evento: {eventName}</p>
+                )}
             </div>
         );
     }
@@ -592,7 +614,9 @@ export function ValidatorPage() {
                     <div className="flex items-center gap-3">
                         <ShieldCheckIcon className="h-8 w-8 text-indigo-600"/>
                         <div>
-                            <h1 className="text-xl font-bold text-slate-800">Painel do Validador</h1>
+                            <h1 className="text-xl font-bold text-slate-800">
+                                Painel do Validador {eventName && `- ${eventName}`}
+                            </h1>
                             <p className="text-sm text-slate-500 font-mono truncate max-w-xs">
                                 {publicKey.toString()}
                                 {isAuthenticated && (
@@ -628,7 +652,7 @@ export function ValidatorPage() {
                             />
                             <StatCard 
                                 title="Total Vendido" 
-                                value={eventAccount?.totalTicketsSold.toString() || '0'} 
+                                value={eventAccount?.ticketsSold.toString() || '0'} 
                                 icon={TicketIcon} 
                                 color="bg-blue-500" 
                             />
